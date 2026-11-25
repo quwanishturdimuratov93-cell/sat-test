@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ұстаз: SAT рейтингі</title>
+<style>
+:root{--ink:#14213d;--mut:#6b7280;--line:#e3e6ec;--bg:#f5f6f9;--card:#fff;--acc:#1f4fd8;--ok:#e3f4ea;--okt:#146c43;--bad:#fbe9e9;--badt:#a12828;--gold:#fff6d6;--silver:#eef0f4;--bronze:#fbe9dc}
+@media (prefers-color-scheme:dark){:root{--ink:#e8ecf5;--mut:#9aa4b5;--line:#2b3446;--bg:#0f1420;--card:#171e2d;--acc:#7da2ff;--ok:#17352a;--okt:#7fd6a8;--bad:#3a1d1f;--badt:#ff9d9d;--gold:#3a3217;--silver:#222a3a;--bronze:#3a2a1d}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 system-ui,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
+.wrap{max-width:980px;margin:0 auto;padding:20px 14px}
+h1{font-size:22px;margin:0}
+.top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.top .sp{flex:1}
+.st{font-size:12px;color:var(--mut)}
+button,input{font:inherit;color:inherit}
+button{border:1px solid var(--line);background:var(--card);padding:8px 14px;border-radius:8px;cursor:pointer}
+button.dng{color:#a12828;border-color:#e3b4b4}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+input{border:1px solid var(--line);background:var(--card);padding:9px 12px;border-radius:8px}
+#login{max-width:340px;margin:12vh auto 0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
+#login h1{margin-bottom:14px}
+#login input{width:100%;margin-bottom:10px}
+#login button{width:100%}
+.err{color:var(--badt);font-size:13px;min-height:18px;margin-bottom:8px}
+table{width:100%;border-collapse:separate;border-spacing:0 6px;font-variant-numeric:tabular-nums}
+th{font-size:12px;color:var(--mut);font-weight:600;padding:0 10px 2px;text-align:center}
+th.l,td.nm{text-align:left}
+td{background:var(--card);padding:11px 10px;text-align:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+td:first-child{border-left:1px solid var(--line);border-radius:10px 0 0 10px}
+td:last-child{border-right:1px solid var(--line);border-radius:0 10px 10px 0}
+td.rk{width:54px;font-weight:700;font-size:17px}
+td.nm{font-weight:600}
+tr.r{cursor:pointer}
+tr.r:hover td{border-color:var(--acc)}
+tr.t1 td{background:var(--gold)}tr.t2 td{background:var(--silver)}tr.t3 td{background:var(--bronze)}
+tr.d td{text-align:left;border-radius:10px;border:1px solid var(--line)}
+.mod{font-size:12px;color:var(--mut);margin:4px 0 6px}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin-bottom:10px}
+.a{border-radius:8px;padding:5px 6px;font-size:12px;display:flex;justify-content:space-between;gap:6px}
+.a b{font-size:13px}
+.a.ok{background:var(--ok);color:var(--okt)}
+.a.bad{background:var(--bad);color:var(--badt)}
+.emp{padding:30px;color:var(--mut);text-align:center}
+.hide{display:none!important}
+@media(max-width:560px){th:nth-child(n+6),td.h{display:none}}
+</style>
+</head>
+<body>
+<div id="login">
+  <h1>Ұстаз кіруі</h1>
+  <input id="pw" type="password" placeholder="Құпиясөз" autocomplete="off">
+  <div class="err" id="lerr"></div>
+  <button class="p" id="go">Кіру</button>
+</div>
+
+<div class="wrap hide" id="app">
+  <div class="top">
+    <h1>SAT рейтингі</h1><span class="st" id="cnt"></span>
+    <span class="sp"></span>
+    <input id="q" placeholder="Оқушыны іздеу">
+    <button id="rf">Жаңарту</button>
+    <button id="clr" class="dng">Тізімді тазалау</button>
+    <button id="out">Шығу</button>
+  </div>
+  <div class="st" id="st" style="margin-bottom:8px"></div>
+  <table>
+    <thead><tr><th>Орын</th><th class="l">Оқушы</th><th>SAT балы</th><th>Дұрыс</th><th>Жауап берді</th><th>M1</th><th>M2</th></tr></thead>
+    <tbody id="body"></tbody>
+  </table>
+</div>
+
+<script>
+const API='https://script.google.com/macros/s/AKfycbwej1Psrdaj262LrYDq5tCJInaDNsNvTXc_O15zIKdPRWdYC2AVTWIRqbdZPKHdVJYG/exec';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TOTAL=44;
+let key='',rows=[],open=new Set(),timer=null;
+try{localStorage.removeItem('tkey')}catch(e){}  // erase any password saved by older versions
+
+async function load(){
+  $('#st').textContent='Жүктелуде…';
+  try{
+    const r=await fetch(API+'?action=teacher&key='+encodeURIComponent(key)+'&t='+Date.now());
+    const j=await r.json();
+    if(j.error)return false;
+    rows=j.rows||[];draw();
+    $('#st').textContent='Жаңартылды: '+new Date().toLocaleTimeString();
+    return true;
+  }catch(e){
+    $('#st').textContent='Қосылу қатесі. Интернетті тексеріңіз.';
+    return null;
+  }
+}
+function ranked(){
+  const best={};
+  rows.forEach(r=>{const k=r.name.trim().toLowerCase(),b=best[k];
+    if(!b||r.c>b.c||(r.c===b.c&&r.ts<b.ts))best[k]=r});
+  return Object.values(best).sort((a,b)=>b.c-a.c||a.ts-b.ts).map((r,i)=>({...r,rank:i+1}));
+}
+function grid(a){
+  let h='';
+  [0,1].forEach(m=>{
+    h+='<div class="mod">Module '+(m+1)+'</div><div class="g">';
+    a.slice(m*22,m*22+22).forEach((v,i)=>{
+      const bad=v.includes('✗')||v==='—';
+      h+='<div class="a '+(bad?'bad':'ok')+'">'+(i+1)+'<b>'+esc(v.replace(' ✗',''))+(v.includes('✗')?' ✗':'')+'</b></div>';
+    });
+    h+='</div>';
+  });
+  return h;
+}
+function draw(){
+  const all=ranked(),q=$('#q').value.trim().toLowerCase();
+  const R=all.filter(r=>r.name.toLowerCase().includes(q));
+  $('#cnt').textContent=all.length+' оқушы';
+  if(!R.length){$('#body').innerHTML='<tr><td colspan="7" class="emp">Нәтиже әлі жоқ</td></tr>';return}
+    $('#body').innerHTML=R.map(r=>{
+    const k=r.name.trim().toLowerCase(),op=open.has(k);
+    return '<tr class="r '+(r.rank<=3?'t'+r.rank:'')+'" data-k="'+esc(encodeURIComponent(k))+'">'
+      +'<td class="rk">'+r.rank+'</td><td class="nm">'+esc(r.name)+'</td>'
+      +'<td><b>'+r.sc+'</b></td><td>'+r.c+'/'+TOTAL+'</td><td>'+r.n+'/'+TOTAL+'</td>'
+      +'<td class="h">'+r.m1+'</td><td class="h">'+r.m2+'</td></tr>'
+      +(op?'<tr class="d"><td colspan="7">'+grid(r.a||[])+'<button class="dng del" data-k="'+esc(encodeURIComponent(k))+'">Осы оқушыны өшіру</button></td></tr>':'');
+  }).join('');
+}
+function show(on){$('#login').classList.toggle('hide',on);$('#app').classList.toggle('hide',!on)}
+async function enter(){
+  key=$('#pw').value;
+  const ok=await load();
+  if(ok){show(true);bump();clearInterval(timer);timer=setInterval(load,20000)}
+  else $('#lerr').textContent=ok===false?'Құпиясөз қате':'Қосылу қатесі';
+}
+// the password lives only in memory: reload, close tab, or 10 min idle = locked
+let idle=null;
+function bump(){clearTimeout(idle);idle=setTimeout(logout,10*60*1000)}
+['click','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{if(key)bump()}));
+function logout(){key='';rows=[];open.clear();$('#body').innerHTML='';$('#q').value='';clearTimeout(idle);clearInterval(timer);$('#pw').value='';$('#lerr').textContent='';show(false)}
+
+$('#go').onclick=enter;
+$('#pw').onkeydown=e=>{if(e.key==='Enter')enter()};
+$('#rf').onclick=load;
+$('#out').onclick=logout;
+$('#q').oninput=draw;
+async function call(action,extra){
+  const r=await fetch(API+'?action='+action+'&key='+encodeURIComponent(key)+(extra||'')+'&t='+Date.now());
+  return r.json();
+}
+$('#clr').onclick=async()=>{
+  if(!confirm('Барлық оқушылардың нәтижесі өшеді.\nКөшірме Google Sheet ішінде «Backup» табына сақталады.\n\nЖалғастыру керек пе?'))return;
+  try{const j=await call('clear');
+    if(j.ok){open.clear();await load();$('#st').textContent='Тізім тазаланды'}
+    else alert('Қате: құпиясөз сәйкес келмейді')}
+  catch(e){alert('Қосылу қатесі. Қайталап көріңіз.')}
+};
+$('#body').onclick=async e=>{
+  const dl=e.target.closest('.del');
+  if(dl){
+    const k=decodeURIComponent(dl.dataset.k);
+    if(!confirm('«'+k+'» нәтижесі өшеді. Жалғастыру керек пе?'))return;
+    try{const j=await call('remove','&name='+encodeURIComponent(k));
+      if(j.ok){open.delete(k);await load()}else alert('Қате: құпиясөз сәйкес келмейді')}
+    catch(err){alert('Қосылу қатесі. Қайталап көріңіз.')}
+    return;
+  }
+  const tr=e.target.closest('tr.r');if(!tr)return;
+  const k=decodeURIComponent(tr.dataset.k);
+  open.has(k)?open.delete(k):open.add(k);draw();
+};
+</script>
+</body>
+</html>
